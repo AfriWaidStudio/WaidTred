@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const quickActions = [
   { icon: Send, label: "Send", path: "/dashboard/send", color: "text-primary" },
+  { icon: ArrowDownLeft, label: "Withdraw", path: "/dashboard/withdraw", color: "text-accent" },
   { icon: ArrowDownLeft, label: "Receive", path: "/dashboard/fund", color: "text-primary" },
   { icon: Smartphone, label: "Recharge", path: "/dashboard/recharge", color: "text-accent" },
   { icon: ShoppingBag, label: "SokoPlace", path: "/dashboard/sokoplace", color: "text-primary" },
@@ -184,6 +185,7 @@ const DashboardHome = () => {
         <div className="h-16" />
       </div>
 
+      {false && <>
       {/* Floating Chat Button */}
       <button
         onClick={() => setChatOpen(!chatOpen)}
@@ -226,6 +228,7 @@ const DashboardHome = () => {
           </div>
         </div>
       )}
+      </>}
     </DashboardLayout>
   );
 };

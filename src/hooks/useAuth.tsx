@@ -18,6 +18,14 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const roleRank: Record<UserRole, number> = {
+  user: 0,
+  moderator: 1,
+  agent: 2,
+  admin: 3,
+  super_admin: 4,
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -29,30 +37,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        setTimeout(() => fetchRole(session.user.id), 0);
+        setLoading(true);
+        setTimeout(() => void fetchRole(session.user.id), 0);
       } else {
         setRole("user");
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) fetchRole(session.user.id);
-      setLoading(false);
+      if (session?.user) void fetchRole(session.user.id);
+      else setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const fetchRole = async (userId: string) => {
-    const { data } = await supabase
+    // Synchronize trusted Supabase Auth confirmation timestamps into the profile.
+    // Ignore rollout-order errors while the matching migration is being deployed.
+    await supabase.rpc("sync_identity_verification");
+    const { data, error } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", userId)
-      .maybeSingle();
-    setRole((data?.role as UserRole) || "user");
+      .eq("user_id", userId);
+    if (error) {
+      setRole("user");
+      setLoading(false);
+      return;
+    }
+    const resolved = (data ?? [])
+      .map((row) => row.role as UserRole)
+      .sort((a, b) => roleRank[b] - roleRank[a])[0] ?? "user";
+    setRole(resolved);
+    setLoading(false);
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {

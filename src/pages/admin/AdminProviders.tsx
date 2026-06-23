@@ -24,6 +24,7 @@ export default function AdminProviders() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Partial<Provider> | null>(null);
+  const [configText, setConfigText] = useState("{}");
   const [detail, setDetail] = useState<Provider | null>(null);
 
   const refresh = async () => {
@@ -40,6 +41,13 @@ export default function AdminProviders() {
 
   const save = async () => {
     if (!editing?.code || !editing?.name) return toast({ title: "Code and name required", variant: "destructive" });
+    let config: Record<string, unknown>;
+    try {
+      config = JSON.parse(configText);
+      if (!config || Array.isArray(config) || typeof config !== "object") throw new Error("Config must be an object");
+    } catch (error) {
+      return toast({ title: "Provider config is invalid JSON", description: error instanceof Error ? error.message : undefined, variant: "destructive" });
+    }
     const payload = {
       code: editing.code!,
       name: editing.name!,
@@ -50,6 +58,7 @@ export default function AdminProviders() {
       service_kinds: editing.service_kinds ?? [],
       base_url: editing.base_url ?? null,
       is_sandbox: editing.is_sandbox ?? true,
+      config,
     };
     const res = editing.id ? await ProviderService.update(editing.id, payload) : await ProviderService.create(payload);
     if ((res as any).error) toast({ title: "Save failed", description: (res as any).error.message, variant: "destructive" });
@@ -77,7 +86,7 @@ export default function AdminProviders() {
           <Input placeholder="Search providers..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-secondary/50 border-border" />
         </div>
         <Button variant="outline" size="sm" onClick={refresh}><RefreshCw className="w-4 h-4 mr-1" />Refresh</Button>
-        <Button variant="hero" size="sm" onClick={() => setEditing({ status: "inactive", priority: 100, is_sandbox: true, countries: [], service_kinds: [] })}>
+        <Button variant="hero" size="sm" onClick={() => { setConfigText("{}"); setEditing({ status: "inactive", priority: 100, is_sandbox: true, countries: [], service_kinds: [] }); }}>
           <Plus className="w-4 h-4 mr-1" />Add Provider
         </Button>
       </div>
@@ -115,7 +124,7 @@ export default function AdminProviders() {
                   <Button size="sm" variant="outline" onClick={() => setDetail(p)}>
                     <Settings className="w-3.5 h-3.5 mr-1" />Configure
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => setEditing(p)}>Edit</Button>
+                  <Button size="sm" variant="outline" onClick={() => { setConfigText(JSON.stringify(p.config ?? {}, null, 2)); setEditing(p); }}>Edit</Button>
                   <Button size="sm" variant="ghost" onClick={() => remove(p)} className="text-destructive">
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
@@ -181,6 +190,11 @@ export default function AdminProviders() {
                     );
                   })}
                 </div>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs text-muted-foreground">Adapter configuration (JSON)</label>
+                <textarea value={configText} onChange={e => setConfigText(e.target.value)} rows={10} spellCheck={false} className="mt-1 w-full rounded-md border border-border bg-secondary/40 p-3 font-mono text-xs" placeholder='{"operations":{"virtual_account":{}},"webhook":{}}' />
+                <p className="text-[10px] text-muted-foreground mt-1">Credentials are referenced with templates such as {"{{credentials.secret_key}}"}; secret values remain in Edge Function environment variables.</p>
               </div>
             </div>
           )}
@@ -335,6 +349,7 @@ function ProviderDetail({ provider, onChanged }: { provider: Provider; onChanged
               }`}>{w.status}</span>
             </div>
             {w.error && <div className="text-destructive">{w.error}</div>}
+            {w.status === "failed" && <Button size="sm" variant="outline" className="mt-2" onClick={async () => { const { error } = await ProviderService.replayWebhook(w.id); if (!error) await load(); }}>Replay</Button>}
           </div>
         ))}
       </TabsContent>

@@ -755,31 +755,52 @@ export type Database = {
       }
       countries: {
         Row: {
+          banking_supported: boolean
           code: string
+          created_at: string
           currency_code: string
           flag_emoji: string | null
           fx_to_smk: number
           id: string
           is_enabled: boolean
+          metadata: Json
+          mobile_money_supported: boolean
           name: string
+          phone_prefix: string | null
+          status: string
+          updated_at: string
         }
         Insert: {
+          banking_supported?: boolean
           code: string
+          created_at?: string
           currency_code: string
           flag_emoji?: string | null
           fx_to_smk?: number
           id?: string
           is_enabled?: boolean
+          metadata?: Json
+          mobile_money_supported?: boolean
           name: string
+          phone_prefix?: string | null
+          status?: string
+          updated_at?: string
         }
         Update: {
+          banking_supported?: boolean
           code?: string
+          created_at?: string
           currency_code?: string
           flag_emoji?: string | null
           fx_to_smk?: number
           id?: string
           is_enabled?: boolean
+          metadata?: Json
+          mobile_money_supported?: boolean
           name?: string
+          phone_prefix?: string | null
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1937,6 +1958,7 @@ export type Database = {
       kyc_documents: {
         Row: {
           address: string | null
+          country: string | null
           created_at: string
           date_of_birth: string | null
           document_number: string | null
@@ -1947,11 +1969,13 @@ export type Database = {
           reviewed_at: string | null
           reviewer_id: string | null
           reviewer_notes: string | null
+          selfie_url: string | null
           status: string
           user_id: string
         }
         Insert: {
           address?: string | null
+          country?: string | null
           created_at?: string
           date_of_birth?: string | null
           document_number?: string | null
@@ -1962,11 +1986,13 @@ export type Database = {
           reviewed_at?: string | null
           reviewer_id?: string | null
           reviewer_notes?: string | null
+          selfie_url?: string | null
           status?: string
           user_id: string
         }
         Update: {
           address?: string | null
+          country?: string | null
           created_at?: string
           date_of_birth?: string | null
           document_number?: string | null
@@ -1977,10 +2003,57 @@ export type Database = {
           reviewed_at?: string | null
           reviewer_id?: string | null
           reviewer_notes?: string | null
+          selfie_url?: string | null
           status?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "kyc_documents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kyc_tier_limits: {
+        Row: {
+          daily_transfer_limit: number
+          daily_withdrawal_limit: number
+          monthly_transfer_limit: number
+          per_transaction_limit: number
+          tier: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          daily_transfer_limit: number
+          daily_withdrawal_limit: number
+          monthly_transfer_limit: number
+          per_transaction_limit: number
+          tier: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          daily_transfer_limit?: number
+          daily_withdrawal_limit?: number
+          monthly_transfer_limit?: number
+          per_transaction_limit?: number
+          tier?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kyc_tier_limits_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lessons: {
         Row: {
@@ -2735,10 +2808,14 @@ export type Database = {
           country: string | null
           created_at: string | null
           email: string | null
+          email_verified: boolean
           full_name: string | null
           id: string
           kyc_status: Database["public"]["Enums"]["kyc_status"] | null
+          kyc_approved_at: string | null
+          kyc_tier: number
           phone: string | null
+          phone_verified: boolean
           updated_at: string | null
         }
         Insert: {
@@ -2747,10 +2824,14 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           email?: string | null
+          email_verified?: boolean
           full_name?: string | null
           id: string
           kyc_status?: Database["public"]["Enums"]["kyc_status"] | null
+          kyc_approved_at?: string | null
+          kyc_tier?: number
           phone?: string | null
+          phone_verified?: boolean
           updated_at?: string | null
         }
         Update: {
@@ -2759,10 +2840,14 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           email?: string | null
+          email_verified?: boolean
           full_name?: string | null
           id?: string
           kyc_status?: Database["public"]["Enums"]["kyc_status"] | null
+          kyc_approved_at?: string | null
+          kyc_tier?: number
           phone?: string | null
+          phone_verified?: boolean
           updated_at?: string | null
         }
         Relationships: []
@@ -4619,6 +4704,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_adjust_wallet: {
+        Args: {
+          _amount: number
+          _direction: string
+          _reason: string
+          _wallet_id: string
+        }
+        Returns: string
+      }
+      admin_set_account_status: {
+        Args: {
+          _status: Database["public"]["Enums"]["account_status"]
+          _user_id: string
+        }
+        Returns: undefined
+      }
+      admin_flag_transaction: {
+        Args: { _reason: string; _transaction_id: string }
+        Returns: undefined
+      }
       buy_event_ticket: { Args: { _event_id: string }; Returns: string }
       claim_mission: {
         Args: { _mission_id: string; _proof?: Json }
@@ -4678,6 +4783,20 @@ export type Database = {
         Returns: string
       }
       execute_due_scheduled_actions: { Args: never; Returns: number }
+      enforce_kyc_limit: {
+        Args: { _amount: number; _operation: string; _user_id: string }
+        Returns: undefined
+      }
+      find_transfer_recipient: {
+        Args: { _query: string }
+        Returns: {
+          avatar_url: string | null
+          email: string | null
+          full_name: string | null
+          id: string
+          phone: string | null
+        }[]
+      }
       family_contribute: {
         Args: { _amount: number; _category?: string; _family_id: string }
         Returns: undefined
@@ -4774,6 +4893,11 @@ export type Database = {
         }
         Returns: string
       }
+      review_kyc_document: {
+        Args: { _approve: boolean; _document_id: string; _notes?: string }
+        Returns: undefined
+      }
+      sync_identity_verification: { Args: never; Returns: number }
       recompute_reputation: { Args: { _user_id: string }; Returns: undefined }
       resolve_provider: {
         Args: {
@@ -4835,7 +4959,7 @@ export type Database = {
         | "card"
       provider_status: "active" | "inactive" | "testing" | "error" | "disabled"
       tredbeing_kind: "saving" | "investment" | "trading" | "merchant"
-      tx_status: "completed" | "pending" | "failed" | "reversed" | "flagged"
+      tx_status: "completed" | "pending" | "failed" | "reversed" | "flagged" | "processing" | "successful" | "refunded"
       tx_type:
         | "transfer"
         | "airtime"
@@ -4844,6 +4968,7 @@ export type Database = {
         | "payment"
         | "received"
         | "qr-pay"
+        | "withdrawal"
       webhook_status:
         | "received"
         | "processing"
@@ -5019,7 +5144,7 @@ export const Constants = {
       ],
       provider_status: ["active", "inactive", "testing", "error", "disabled"],
       tredbeing_kind: ["saving", "investment", "trading", "merchant"],
-      tx_status: ["completed", "pending", "failed", "reversed", "flagged"],
+      tx_status: ["completed", "pending", "failed", "reversed", "flagged", "processing", "successful", "refunded"],
       tx_type: [
         "transfer",
         "airtime",
@@ -5028,6 +5153,7 @@ export const Constants = {
         "payment",
         "received",
         "qr-pay",
+        "withdrawal",
       ],
       webhook_status: [
         "received",

@@ -1,5 +1,5 @@
 import AdminLayout from "@/components/admin/AdminLayout";
-import { Search, ArrowUpRight, ArrowDownLeft, RotateCcw, Flag } from "lucide-react";
+import { Search, Flag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useEffect, useState } from "react";
 import { txStatusColors } from "@/lib/constants";
@@ -26,11 +26,6 @@ const AdminTransactions = () => {
     tx.id.toLowerCase().includes(search.toLowerCase())
   );
 
-  const setStatus = async (id: string, status: string) => {
-    const { error } = await AdminService.setTxStatus(id, status);
-    if (error) return toast.error(error.message);
-    toast.success(`Marked ${status}`); load();
-  };
   const flag = async (id: string) => {
     const reason = prompt("Reason for flagging?"); if (!reason) return;
     const { error } = await AdminService.flagTx(id, reason);
@@ -82,9 +77,6 @@ const AdminTransactions = () => {
                   <td className="p-3"><span className={`text-[10px] px-2 py-0.5 rounded-md font-medium ${txStatusColors[tx.status] || ""}`}>{tx.status}</span></td>
                   <td className="p-3">
                     <div className="flex gap-1">
-                      {tx.status === "flagged" && <button onClick={() => setStatus(tx.id, "completed")} className="p-1.5 rounded-lg hover:bg-primary/10" title="Approve"><ArrowUpRight className="w-3.5 h-3.5 text-primary" /></button>}
-                      {tx.status === "flagged" && <button onClick={() => setStatus(tx.id, "failed")} className="p-1.5 rounded-lg hover:bg-destructive/10" title="Decline"><ArrowDownLeft className="w-3.5 h-3.5 text-destructive" /></button>}
-                      {tx.status === "completed" && <button onClick={() => setStatus(tx.id, "reversed")} className="p-1.5 rounded-lg hover:bg-secondary" title="Reverse"><RotateCcw className="w-3.5 h-3.5 text-muted-foreground" /></button>}
                       {tx.status !== "flagged" && <button onClick={() => flag(tx.id)} className="p-1.5 rounded-lg hover:bg-secondary" title="Flag"><Flag className="w-3.5 h-3.5 text-muted-foreground" /></button>}
                     </div>
                   </td>

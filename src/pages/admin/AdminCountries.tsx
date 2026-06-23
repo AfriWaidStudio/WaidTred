@@ -1,89 +1,111 @@
-import { useState } from "react";
-import { Globe, Plus, Settings, ToggleLeft, ToggleRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Building2, Globe, Loader2, Plus, Smartphone, ToggleLeft, ToggleRight } from "lucide-react";
 import AdminLayout from "@/components/admin/AdminLayout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
-const mockCountries = [
-  { code: "GH", flag: "🇬🇭", name: "Ghana", currency: "GHS", methods: ["Mobile Money", "Bank Transfer"], agents: 3, status: "active" },
-  { code: "NG", flag: "🇳🇬", name: "Nigeria", currency: "NGN", methods: ["Bank Transfer", "USSD"], agents: 5, status: "active" },
-  { code: "KE", flag: "🇰🇪", name: "Kenya", currency: "KES", methods: ["M-Pesa", "Bank Transfer"], agents: 2, status: "active" },
-  { code: "ZA", flag: "🇿🇦", name: "South Africa", currency: "ZAR", methods: ["Bank Transfer", "EFT"], agents: 1, status: "active" },
-  { code: "GB", flag: "🇬🇧", name: "United Kingdom", currency: "GBP", methods: ["Bank Transfer", "Card"], agents: 2, status: "active" },
-  { code: "US", flag: "🇺🇸", name: "United States", currency: "USD", methods: ["ACH", "Wire"], agents: 1, status: "pending" },
-  { code: "DE", flag: "🇩🇪", name: "Germany", currency: "EUR", methods: ["SEPA"], agents: 0, status: "pending" },
-  { code: "IN", flag: "🇮🇳", name: "India", currency: "INR", methods: ["UPI", "IMPS"], agents: 2, status: "active" },
-];
+type Country = Database["public"]["Tables"]["countries"]["Row"];
+
+const emptyCountry = {
+  code: "",
+  name: "",
+  currency_code: "",
+  phone_prefix: "",
+  mobile_money_supported: false,
+  banking_supported: true,
+};
 
 const AdminCountries = () => {
-  const [countries] = useState(mockCountries);
+  const { toast } = useToast();
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(emptyCountry);
+
+  const load = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from("countries").select("*").order("name");
+    setLoading(false);
+    if (error) return toast({ title: "Could not load countries", description: error.message, variant: "destructive" });
+    setCountries(data ?? []);
+  };
+  useEffect(() => { void load(); }, []);
+
+  const addCountry = async () => {
+    if (!/^[A-Z]{2}$/.test(form.code) || !/^[A-Z]{3}$/.test(form.currency_code) || !form.name.trim()) {
+      return toast({ title: "Enter a valid ISO code, name, and currency", variant: "destructive" });
+    }
+    setSaving(true);
+    const { error } = await supabase.from("countries").insert({
+      ...form,
+      is_enabled: false,
+      status: "inactive",
+      fx_to_smk: 1,
+    });
+    setSaving(false);
+    if (error) return toast({ title: "Country was not added", description: error.message, variant: "destructive" });
+    setAdding(false);
+    setForm(emptyCountry);
+    await load();
+  };
+
+  const toggle = async (country: Country) => {
+    const active = country.status !== "active";
+    const { error } = await supabase.from("countries").update({ status: active ? "active" : "inactive", is_enabled: active }).eq("id", country.id);
+    if (error) return toast({ title: "Update failed", description: error.message, variant: "destructive" });
+    await load();
+  };
 
   return (
     <AdminLayout>
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="font-display font-bold text-foreground text-lg">Country & Payment Settings</h3>
-          <p className="text-xs text-muted-foreground">Manage supported countries, payment methods, and regional agents</p>
+          <h3 className="font-display font-bold text-foreground text-lg">Country Registry</h3>
+          <p className="text-xs text-muted-foreground">Configure markets without deploying application code.</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
-          <Plus className="w-4 h-4" /> Add Country
-        </button>
+        <Button onClick={() => setAdding(!adding)}><Plus className="w-4 h-4 mr-2" />Add Country</Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: "Active Countries", value: countries.filter(c => c.status === "active").length },
-          { label: "Pending Launch", value: countries.filter(c => c.status === "pending").length },
-          { label: "Total Agents", value: countries.reduce((s, c) => s + c.agents, 0) },
-          { label: "Payment Methods", value: [...new Set(countries.flatMap(c => c.methods))].length },
-        ].map(s => (
-          <div key={s.label} className="glass-card p-4">
-            <p className="text-2xl font-bold font-display text-foreground">{s.value}</p>
-            <p className="text-[11px] text-muted-foreground">{s.label}</p>
-          </div>
-        ))}
+      {adding && (
+        <div className="glass-card p-4 mb-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <Input value={form.code} maxLength={2} placeholder="ISO (NG)" onChange={e => setForm({ ...form, code: e.target.value.toUpperCase() })} />
+          <Input value={form.name} placeholder="Country name" onChange={e => setForm({ ...form, name: e.target.value })} />
+          <Input value={form.currency_code} maxLength={3} placeholder="Currency (NGN)" onChange={e => setForm({ ...form, currency_code: e.target.value.toUpperCase() })} />
+          <Input value={form.phone_prefix} placeholder="Phone prefix (+234)" onChange={e => setForm({ ...form, phone_prefix: e.target.value })} />
+          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.mobile_money_supported} onChange={e => setForm({ ...form, mobile_money_supported: e.target.checked })} />Mobile money</label>
+          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={form.banking_supported} onChange={e => setForm({ ...form, banking_supported: e.target.checked })} />Banking</label>
+          <Button onClick={addCountry} disabled={saving}>{saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}Save inactive country</Button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="glass-card p-4"><p className="text-2xl font-bold">{countries.filter(c => c.status === "active").length}</p><p className="text-[11px] text-muted-foreground">Active countries</p></div>
+        <div className="glass-card p-4"><p className="text-2xl font-bold">{countries.filter(c => c.mobile_money_supported).length}</p><p className="text-[11px] text-muted-foreground">Mobile-money markets</p></div>
+        <div className="glass-card p-4"><p className="text-2xl font-bold">{countries.filter(c => c.banking_supported).length}</p><p className="text-[11px] text-muted-foreground">Banking markets</p></div>
       </div>
 
-      {/* Countries Grid */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {loading && <Loader2 className="w-6 h-6 animate-spin mx-auto my-12" />}
+      {!loading && <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {countries.map(country => (
-          <div key={country.code} className="glass-card p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">{country.flag}</span>
-                <div>
-                  <p className="font-semibold text-foreground text-sm">{country.name}</p>
-                  <p className="text-[11px] text-muted-foreground">{country.currency}</p>
-                </div>
-              </div>
-              <span className={`text-[10px] px-2 py-0.5 rounded-md font-medium ${
-                country.status === "active" ? "bg-primary/10 text-primary" : "bg-accent/10 text-accent"
-              }`}>{country.status}</span>
+          <div key={country.id} className="glass-card p-4">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex gap-2"><Globe className="w-5 h-5 text-primary" /><div><p className="font-semibold text-sm">{country.name}</p><p className="text-[11px] text-muted-foreground">{country.code} · {country.currency_code} · {country.phone_prefix || "No prefix"}</p></div></div>
+              <span className={`text-[10px] px-2 py-0.5 rounded ${country.status === "active" ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"}`}>{country.status}</span>
             </div>
-
-            <div className="mb-3">
-              <p className="text-[10px] text-muted-foreground mb-1">Payment Methods</p>
-              <div className="flex flex-wrap gap-1">
-                {country.methods.map(m => (
-                  <span key={m} className="text-[10px] bg-secondary px-2 py-0.5 rounded text-foreground">{m}</span>
-                ))}
-              </div>
+            <div className="flex gap-2 mb-3">
+              {country.mobile_money_supported && <span className="text-[10px] bg-secondary px-2 py-1 rounded flex items-center gap-1"><Smartphone className="w-3 h-3" />Mobile money</span>}
+              {country.banking_supported && <span className="text-[10px] bg-secondary px-2 py-1 rounded flex items-center gap-1"><Building2 className="w-3 h-3" />Banking</span>}
             </div>
-
-            <div className="flex items-center justify-between pt-2 border-t border-border">
-              <span className="text-[11px] text-muted-foreground">{country.agents} agents assigned</span>
-              <div className="flex gap-1">
-                <button className="p-1.5 rounded-lg bg-secondary/50 text-muted-foreground hover:text-foreground">
-                  <Settings className="w-3.5 h-3.5" />
-                </button>
-                <button className="p-1.5 rounded-lg bg-secondary/50 text-muted-foreground hover:text-foreground">
-                  {country.status === "active" ? <ToggleRight className="w-3.5 h-3.5 text-primary" /> : <ToggleLeft className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-            </div>
+            <button onClick={() => toggle(country)} className="w-full flex justify-end pt-2 border-t border-border" aria-label={`${country.status === "active" ? "Disable" : "Enable"} ${country.name}`}>
+              {country.status === "active" ? <ToggleRight className="w-5 h-5 text-primary" /> : <ToggleLeft className="w-5 h-5 text-muted-foreground" />}
+            </button>
           </div>
         ))}
-      </div>
+      </div>}
     </AdminLayout>
   );
 };

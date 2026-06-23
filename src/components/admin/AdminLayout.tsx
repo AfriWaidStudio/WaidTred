@@ -13,6 +13,7 @@ const sections = [
   { label: "Wallets", icon: Wallet, path: "/admin/wallets" },
   { label: "Transactions", icon: ArrowLeftRight, path: "/admin/transactions" },
   { label: "Funding (KVI)", icon: Smartphone, path: "/admin/funding" },
+  { label: "Withdrawals", icon: Banknote, path: "/admin/withdrawals" },
   { label: "Global Ops", icon: Globe, path: "/admin/global" },
   { label: "Countries", icon: Globe, path: "/admin/countries" },
   { label: "Recharge", icon: Smartphone, path: "/admin/recharge" },

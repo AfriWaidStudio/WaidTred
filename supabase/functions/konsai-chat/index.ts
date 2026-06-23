@@ -8,7 +8,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const TOOLS = [
+const ALL_TOOLS = [
   {
     type: "function",
     function: {
@@ -101,8 +101,12 @@ const TOOLS = [
   },
 ];
 
+const READ_ONLY_TOOL_NAMES = new Set(["get_balance", "get_recent_transactions", "get_spending_summary"]);
+const TOOLS = ALL_TOOLS.filter((tool) => READ_ONLY_TOOL_NAMES.has(tool.function.name));
+
 async function runTool(name: string, args: any, supabase: any, userId: string) {
   try {
+    if (!READ_ONLY_TOOL_NAMES.has(name)) return { error: "Financial actions are disabled for Waides KI" };
     switch (name) {
       case "get_balance": {
         const { data } = await supabase.from("wallets").select("available_balance, locked_balance, total_balance, currency_type").eq("user_id", userId).maybeSingle();
@@ -194,7 +198,7 @@ Deno.serve(async (req) => {
     const { data: history } = await supabase.from("chat_messages").select("role,content,tool_calls,tool_name").eq("conversation_id", convId).order("created_at").limit(30);
 
     const sysPrompt = `You are KonsAI, the WaidTred financial assistant. The user is ${profile?.full_name ?? "a user"} (${profile?.email ?? ""}). Currency: Smai Sika (ꠄ, code SMK). Today is ${new Date().toISOString()}.
-Use tools to act for the user: check balance, find contacts, send money, schedule reminders or future transfers/requests. When the user says "at 6pm tonight remind X to do Y", call schedule_action with the right ISO datetime. Always confirm amounts before sending money. Be concise and friendly.`;
+Provide read-only spending insights, monthly summaries, and practical savings suggestions. Never initiate, schedule, approve, or modify a transaction, account, contact, or wallet. Avoid regulated financial advice and be concise.`;
 
     const messages: any[] = [{ role: "system", content: sysPrompt }];
     for (const m of history ?? []) {

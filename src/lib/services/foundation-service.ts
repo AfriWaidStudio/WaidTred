@@ -54,9 +54,22 @@ export const FundingService = {
 };
 
 export const KycService = {
+  async uploadEvidence(file: File, kind: "document" | "selfie") {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return { data: null, error: new Error("Not authenticated") };
+    const extension = file.name.split(".").pop()?.toLowerCase() || "bin";
+    const path = `${u.user.id}/${crypto.randomUUID()}-${kind}.${extension}`;
+    const { error } = await supabase.storage.from("kyc-documents").upload(path, file, {
+      cacheControl: "3600",
+      contentType: file.type,
+      upsert: false,
+    });
+    return { data: error ? null : path, error };
+  },
   async submit(input: {
     document_type: string; document_number?: string; full_name?: string;
-    date_of_birth?: string; address?: string; document_url?: string;
+    date_of_birth?: string; address?: string; country?: string;
+    document_url?: string; selfie_url?: string;
   }) {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return { error: new Error("Not authenticated") };

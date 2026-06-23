@@ -24,18 +24,14 @@ export const WalletService = {
     return { data: data || [], error };
   },
 
-  async adjustBalance(walletId: string, newAvailable: number, newLocked: number) {
-    const total = newAvailable + newLocked;
-    const { error } = await supabase
-      .from("wallets")
-      .update({
-        available_balance: newAvailable,
-        locked_balance: newLocked,
-        total_balance: total,
-        last_updated: new Date().toISOString(),
-      })
-      .eq("id", walletId);
-    return { error };
+  async adjustBalance(walletId: string, direction: "credit" | "debit", amount: number, reason: string) {
+    const { data, error } = await supabase.rpc("admin_adjust_wallet", {
+      _wallet_id: walletId,
+      _direction: direction,
+      _amount: amount,
+      _reason: reason,
+    });
+    return { data, error };
   },
 
   async getLedger(limit = 50) {
@@ -57,11 +53,10 @@ export const WalletService = {
   },
 
   async findUserByPhoneOrEmail(query: string) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, full_name, email, phone, avatar_url")
-      .or(`phone.eq.${query},email.eq.${query}`)
-      .maybeSingle();
-    return data;
+    const { data, error } = await supabase.rpc("find_transfer_recipient", {
+      _query: query,
+    });
+    if (error) return null;
+    return data?.[0] ?? null;
   },
 };

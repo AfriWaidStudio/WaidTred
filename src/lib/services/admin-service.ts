@@ -11,9 +11,13 @@ export const AdminService = {
   },
   getUser: async (id: string) => (await supabase.from("profiles").select("*").eq("id", id).maybeSingle()).data,
   setAccountStatus: async (id: string, account_status: "active" | "frozen" | "suspended" | "closed") =>
-    supabase.from("profiles").update({ account_status }).eq("id", id),
-  setKycStatus: async (id: string, kyc_status: "pending" | "verified" | "rejected") =>
-    supabase.from("profiles").update({ kyc_status }).eq("id", id),
+    supabase.rpc("admin_set_account_status", { _user_id: id, _status: account_status }),
+  listKycSubmissions: async () =>
+    (await supabase.from("kyc_documents").select("*, profile:profiles!kyc_documents_user_id_fkey(full_name,email,country)").order("created_at", { ascending: false }).limit(200)).data ?? [],
+  reviewKyc: async (documentId: string, approve: boolean, notes?: string) =>
+    supabase.rpc("review_kyc_document", { _document_id: documentId, _approve: approve, _notes: notes ?? null }),
+  getKycEvidenceUrl: async (path: string) =>
+    (await supabase.storage.from("kyc-documents").createSignedUrl(path, 300)).data?.signedUrl ?? null,
 
   // Wallets
   listWallets: async () =>
@@ -28,11 +32,8 @@ export const AdminService = {
     else if (filter === "bills") q = q.eq("type", "bill");
     return (await q).data ?? [];
   },
-  setTxStatus: async (id: string, status: string) => supabase.from("transactions").update({ status: status as any }).eq("id", id),
   flagTx: async (id: string, reason: string) => {
-    const reporter_id = await uid();
-    await supabase.from("transactions").update({ status: "flagged" }).eq("id", id);
-    return supabase.from("flagged_content").insert({ content_type: "transaction", content_id: id, reason, reporter_id });
+    return supabase.rpc("admin_flag_transaction", { _transaction_id: id, _reason: reason });
   },
 
   // Funding

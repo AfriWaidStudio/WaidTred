@@ -77,6 +77,8 @@ export const ProviderService = {
     if (provider_id) q = q.eq("provider_id", provider_id);
     return (await q).data ?? [];
   },
+  replayWebhook: (webhook_id: string) =>
+    supabase.rpc("admin_replay_webhook" as any, { _webhook_id: webhook_id }),
 
   // Routing resolution (test in admin)
   resolve: async (service_kind: ProviderServiceKind, country: string) =>

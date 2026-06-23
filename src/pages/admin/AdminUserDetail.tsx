@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AdminLayout from "@/components/admin/AdminLayout";
-import { ArrowLeft, User, Wallet, ArrowLeftRight, ShieldCheck, Ban, CheckCircle, Mail, Phone, Globe, Calendar, Unlock } from "lucide-react";
+import { ArrowLeft, User, Wallet, ArrowLeftRight, ShieldCheck, Ban, Mail, Phone, Globe, Calendar, Unlock } from "lucide-react";
 import { AdminService } from "@/lib/services";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -29,10 +29,6 @@ const AdminUserDetail = () => {
     const next = u.account_status === "frozen" ? "active" : "frozen";
     await AdminService.setAccountStatus(u.id, next as any);
     toast.success(`Account ${next}`); load();
-  };
-  const verifyKyc = async () => {
-    await AdminService.setKycStatus(u.id, "verified");
-    toast.success("KYC verified"); load();
   };
 
   return (
@@ -63,7 +59,7 @@ const AdminUserDetail = () => {
               {u.account_status === "frozen" ? <><Unlock className="w-3 h-3" /> Unfreeze</> : <><Ban className="w-3 h-3" /> Freeze</>}
             </button>
             {u.kyc_status !== "verified" && (
-              <button onClick={verifyKyc} className="flex-1 py-2 rounded-lg bg-primary/10 text-primary text-xs flex items-center justify-center gap-1"><CheckCircle className="w-3 h-3" /> Verify KYC</button>
+              <button onClick={() => navigate("/admin/compliance")} className="flex-1 py-2 rounded-lg bg-primary/10 text-primary text-xs flex items-center justify-center gap-1"><ShieldCheck className="w-3 h-3" /> Review KYC</button>
             )}
           </div>
         </div>

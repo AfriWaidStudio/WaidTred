@@ -26,11 +26,6 @@ const AdminUsers = () => {
     if (error) return toast.error(error.message);
     toast.success(`Account ${next}`); load();
   };
-  const verifyKyc = async (u: any) => {
-    const { error } = await AdminService.setKycStatus(u.id, "verified");
-    if (error) return toast.error(error.message);
-    toast.success("KYC verified"); load();
-  };
 
   return (
     <AdminLayout>
@@ -78,7 +73,7 @@ const AdminUsers = () => {
                         {u.account_status === "frozen" ? <Unlock className="w-3.5 h-3.5 text-primary" /> : <Lock className="w-3.5 h-3.5 text-muted-foreground" />}
                       </button>
                       {u.kyc_status !== "verified" && (
-                        <button onClick={() => verifyKyc(u)} className="p-1.5 rounded-lg hover:bg-secondary" title="Verify KYC"><Shield className="w-3.5 h-3.5 text-primary" /></button>
+                        <button onClick={() => navigate("/admin/compliance")} className="p-1.5 rounded-lg hover:bg-secondary" title="Review KYC evidence"><Shield className="w-3.5 h-3.5 text-primary" /></button>
                       )}
                     </div>
                   </td>

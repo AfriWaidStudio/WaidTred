@@ -5,3 +5,18 @@ verify_jwt = true
 
 [functions.process-scheduled-actions]
 verify_jwt = false
+
+[functions.provider-orchestrator]
+verify_jwt = true
+
+[functions.provider-webhook]
+verify_jwt = false
+
+[functions.beneficiary-orchestrator]
+verify_jwt = true
+
+[functions.process-provider-transactions]
+verify_jwt = false
+
+[functions.service-purchase]
+verify_jwt = true

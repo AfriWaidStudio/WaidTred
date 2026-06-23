@@ -1,33 +1,89 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
-import { ArrowLeft, Upload, CheckCircle, Clock, Camera, FileText, User, Loader2 } from "lucide-react";
+import { ArrowLeft, Upload, CheckCircle, Clock, Camera, FileText, User, Loader2, Mail, Phone, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { KycService } from "@/lib/services";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const steps = ["Personal Info", "ID Document", "Selfie", "Review"];
 
 const KYC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({ firstName: "", lastName: "", dob: "", country: "", address: "", idType: "passport", idNumber: "" });
-  const [idUploaded, setIdUploaded] = useState(false);
-  const [selfieUploaded, setSelfieUploaded] = useState(false);
+  const [idFile, setIdFile] = useState<File | null>(null);
+  const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [existing, setExisting] = useState<any[]>([]);
+  const [identity, setIdentity] = useState({ email_verified: false, phone_verified: false, kyc_tier: 0 });
+  const [phone, setPhone] = useState(user?.phone || "");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [phoneBusy, setPhoneBusy] = useState(false);
 
-  useEffect(() => { KycService.listMine().then(({ data }) => setExisting(data)); }, [step]);
+  const refreshIdentity = async () => {
+    await supabase.rpc("sync_identity_verification");
+    const { data } = await supabase.from("profiles").select("email_verified,phone_verified,kyc_tier,phone").maybeSingle();
+    if (data) {
+      setIdentity(data);
+      if (data.phone) setPhone(data.phone);
+    }
+  };
+
+  useEffect(() => {
+    KycService.listMine().then(({ data }) => setExisting(data));
+    void refreshIdentity();
+  }, [step]);
+
+  const sendPhoneOtp = async () => {
+    if (!/^\+[1-9]\d{7,14}$/.test(phone)) return toast({ title: "Use international format", description: "Example: +233241234567", variant: "destructive" });
+    setPhoneBusy(true);
+    const { error } = await supabase.auth.updateUser({ phone });
+    setPhoneBusy(false);
+    if (error) return toast({ title: "Could not send code", description: error.message, variant: "destructive" });
+    setOtpSent(true);
+    toast({ title: "Verification code sent" });
+  };
+
+  const verifyPhoneOtp = async () => {
+    if (!/^\d{6}$/.test(otp)) return toast({ title: "Enter the 6-digit code", variant: "destructive" });
+    setPhoneBusy(true);
+    const { error } = await supabase.auth.verifyOtp({ phone, token: otp, type: "phone_change" });
+    if (!error) await refreshIdentity();
+    setPhoneBusy(false);
+    if (error) return toast({ title: "Verification failed", description: error.message, variant: "destructive" });
+    toast({ title: "Phone verified", description: "Tier 1 unlocked." });
+    setOtpSent(false);
+  };
 
   const submit = async () => {
+    if (!idFile || !selfieFile) {
+      return toast({ title: "Evidence required", description: "Upload an ID document and a selfie.", variant: "destructive" });
+    }
     setSubmitting(true);
+    const documentUpload = await KycService.uploadEvidence(idFile, "document");
+    if (documentUpload.error || !documentUpload.data) {
+      setSubmitting(false);
+      return toast({ title: "ID upload failed", description: documentUpload.error?.message, variant: "destructive" });
+    }
+    const selfieUpload = await KycService.uploadEvidence(selfieFile, "selfie");
+    if (selfieUpload.error || !selfieUpload.data) {
+      setSubmitting(false);
+      return toast({ title: "Selfie upload failed", description: selfieUpload.error?.message, variant: "destructive" });
+    }
     const { error } = await KycService.submit({
       document_type: form.idType,
       document_number: form.idNumber,
       full_name: `${form.firstName} ${form.lastName}`.trim(),
       date_of_birth: form.dob || undefined,
       address: form.address,
-      document_url: idUploaded ? "uploaded" : undefined,
+      country: form.country,
+      document_url: documentUpload.data,
+      selfie_url: selfieUpload.data,
     });
     setSubmitting(false);
     if (error) return toast({ title: "Submission failed", description: error.message, variant: "destructive" });
@@ -41,6 +97,21 @@ const KYC = () => {
         <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-muted-foreground text-sm mb-4"><ArrowLeft className="w-4 h-4" /> Back</button>
         <h1 className="font-display text-xl font-bold mb-2">Identity Verification</h1>
         <p className="text-xs text-muted-foreground mb-6">Complete KYC to unlock full features</p>
+
+        <div className="glass-card rounded-2xl p-4 mb-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-primary" />Verification tier</p>
+            <span className="text-xs font-bold text-primary">Tier {identity.kyc_tier}</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs"><Mail className="w-3.5 h-3.5" /><span className="flex-1">Email</span><span className={identity.email_verified ? "text-primary" : "text-accent"}>{identity.email_verified ? "Verified" : "Pending"}</span></div>
+          <div className="flex items-center gap-2 text-xs"><Phone className="w-3.5 h-3.5" /><span className="flex-1">Phone</span><span className={identity.phone_verified ? "text-primary" : "text-accent"}>{identity.phone_verified ? "Verified" : "Required"}</span></div>
+          {!identity.phone_verified && (
+            <div className="flex gap-2 pt-1">
+              <input value={otpSent ? otp : phone} onChange={e => otpSent ? setOtp(e.target.value.replace(/\D/g, "").slice(0, 6)) : setPhone(e.target.value.trim())} placeholder={otpSent ? "6-digit code" : "+233241234567"} className="min-w-0 flex-1 px-3 py-2 bg-secondary/50 border border-border rounded-xl text-sm" />
+              <button onClick={otpSent ? verifyPhoneOtp : sendPhoneOtp} disabled={phoneBusy} className="px-3 py-2 rounded-xl gradient-primary text-primary-foreground text-xs font-semibold disabled:opacity-50">{phoneBusy ? "Please wait" : otpSent ? "Verify" : "Send code"}</button>
+            </div>
+          )}
+        </div>
 
         {existing.length > 0 && step < 3 && (
           <div className="glass-card rounded-2xl p-4 mb-4">
@@ -84,23 +155,25 @@ const KYC = () => {
             <div className="space-y-4">
               <h3 className="font-semibold text-sm flex items-center gap-2"><FileText className="w-4 h-4 text-primary" /> ID Document</h3>
               <select value={form.idType} onChange={e => setForm({ ...form, idType: e.target.value })} className="w-full px-3 py-2.5 bg-secondary/50 border border-border rounded-xl text-sm">
-                <option value="passport">Passport</option><option value="national_id">National ID</option><option value="drivers_license">Driver's License</option>
+                <option value="passport">Passport</option><option value="national_id">National ID</option><option value="drivers_license">Driver's License</option><option value="proof_of_address">Proof of Address (Tier 3)</option>
               </select>
               <input placeholder="ID Number" value={form.idNumber} onChange={e => setForm({ ...form, idNumber: e.target.value })} className="w-full px-3 py-2.5 bg-secondary/50 border border-border rounded-xl text-sm" />
-              <button onClick={() => setIdUploaded(true)} className={`w-full py-10 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 ${idUploaded ? "border-primary bg-primary/5" : "border-border"}`}>
-                {idUploaded ? <CheckCircle className="w-8 h-8 text-primary" /> : <Upload className="w-8 h-8 text-muted-foreground" />}
-                <span className="text-xs text-muted-foreground">{idUploaded ? "Document uploaded" : "Upload front of ID"}</span>
-              </button>
+              <label className={`w-full py-10 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 cursor-pointer ${idFile ? "border-primary bg-primary/5" : "border-border"}`}>
+                {idFile ? <CheckCircle className="w-8 h-8 text-primary" /> : <Upload className="w-8 h-8 text-muted-foreground" />}
+                <span className="text-xs text-muted-foreground">{idFile?.name || "Upload front of ID"}</span>
+                <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="sr-only" onChange={e => setIdFile(e.target.files?.[0] ?? null)} />
+              </label>
             </div>
           )}
 
           {step === 2 && (
             <div className="space-y-4 text-center">
               <h3 className="font-semibold text-sm flex items-center justify-center gap-2"><Camera className="w-4 h-4 text-primary" /> Take a Selfie</h3>
-              <button onClick={() => setSelfieUploaded(true)} className={`w-full py-16 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 ${selfieUploaded ? "border-primary bg-primary/5" : "border-border"}`}>
-                {selfieUploaded ? <CheckCircle className="w-10 h-10 text-primary" /> : <Camera className="w-10 h-10 text-muted-foreground" />}
-                <span className="text-xs text-muted-foreground">{selfieUploaded ? "Selfie captured" : "Tap to capture"}</span>
-              </button>
+              <label className={`w-full py-16 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 cursor-pointer ${selfieFile ? "border-primary bg-primary/5" : "border-border"}`}>
+                {selfieFile ? <CheckCircle className="w-10 h-10 text-primary" /> : <Camera className="w-10 h-10 text-muted-foreground" />}
+                <span className="text-xs text-muted-foreground">{selfieFile?.name || "Capture or upload selfie"}</span>
+                <input type="file" accept="image/jpeg,image/png,image/webp" capture="user" className="sr-only" onChange={e => setSelfieFile(e.target.files?.[0] ?? null)} />
+              </label>
             </div>
           )}
 

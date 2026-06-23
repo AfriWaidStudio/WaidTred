@@ -20,6 +20,7 @@ const Auth$ = ({ children, allow }: { children: React.ReactNode; allow?: ("super
 // User Dashboard
 import DashboardHome from "./pages/DashboardHome";
 import SendMoney from "./pages/SendMoney";
+import WithdrawMoney from "./pages/WithdrawMoney";
 import TransactionHistory from "./pages/TransactionHistory";
 import Recharge from "./pages/Recharge";
 import Profile from "./pages/Profile";
@@ -66,6 +67,7 @@ import AdminAlerts from "./pages/admin/AdminAlerts";
 import AdminAuditLog from "./pages/admin/AdminAuditLog";
 import AdminSmaiPins from "./pages/admin/AdminSmaiPins";
 import AdminFunding from "./pages/admin/AdminFunding";
+import AdminWithdrawals from "./pages/admin/AdminWithdrawals";
 import AdminCountries from "./pages/admin/AdminCountries";
 import AdminAgents from "./pages/admin/AdminAgents";
 import AdminChat from "./pages/admin/AdminChat";
@@ -184,6 +186,7 @@ const App = () => (
             {/* User Dashboard */}
             <Route path="/dashboard" element={<Auth$><DashboardHome /></Auth$>} />
             <Route path="/dashboard/send" element={<Auth$><SendMoney /></Auth$>} />
+            <Route path="/dashboard/withdraw" element={<Auth$><WithdrawMoney /></Auth$>} />
             <Route path="/dashboard/history" element={<Auth$><TransactionHistory /></Auth$>} />
             <Route path="/dashboard/recharge" element={<Auth$><Recharge /></Auth$>} />
             <Route path="/dashboard/profile" element={<Auth$><Profile /></Auth$>} />
@@ -297,6 +300,7 @@ const App = () => (
             <Route path="/admin/wallets" element={<Auth$ allow={["admin"]}><AdminWallets /></Auth$>} />
             <Route path="/admin/transactions" element={<Auth$ allow={["admin"]}><AdminTransactions /></Auth$>} />
             <Route path="/admin/funding" element={<Auth$ allow={["admin"]}><AdminFunding /></Auth$>} />
+            <Route path="/admin/withdrawals" element={<Auth$ allow={["admin"]}><AdminWithdrawals /></Auth$>} />
             <Route path="/admin/global" element={<Auth$ allow={["admin"]}><AdminGlobal /></Auth$>} />
             <Route path="/admin/countries" element={<Auth$ allow={["admin"]}><AdminCountries /></Auth$>} />
             <Route path="/admin/recharge" element={<Auth$ allow={["admin"]}><AdminRecharge /></Auth$>} />
