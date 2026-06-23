@@ -28,7 +28,7 @@ const HeroSection = () => {
         </h1>
 
         <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-4 font-light">
-          The Global Financial Operating System
+          Your Financial Operating System
         </p>
         <p className="text-base md:text-lg text-muted-foreground/70 max-w-2xl mx-auto mb-10">
           Send money, pay bills, recharge phones, and access financial services — anywhere in the world, instantly.

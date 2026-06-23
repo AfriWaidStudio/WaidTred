@@ -174,7 +174,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter basename="/WaidTred">
+      <BrowserRouter basename="/App">
         <AuthProvider>
           <Routes>
             {/* Public */}
